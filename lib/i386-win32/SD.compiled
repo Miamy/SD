@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
 <CONFIG>
-  <Compiler Value="C:\lazarus\fpc\2.6.2\bin\i386-win32\fpc.exe" Date="1125670419"/>
-  <Params Value=" -MObjFPC -Scghi -O1 -g -gl -vewnhi -FiC:\SD\lib\i386-win32 -FuC:\SD\ -FUC:\SD\lib\i386-win32\ -l SD.lpr"/>
+  <Compiler Value="C:\lazarus\fpc\2.6.0\bin\i386-win32\fpc.exe" Date="1080972742"/>
+  <Params Value=" -MObjFPC -Scghi -O1 -gl -vewnhi -l -FiE:\Miamy\SD\lib\i386-win32 -FuE:\Miamy\SD\ -Fu. -FUE:\Miamy\SD\lib\i386-win32\ -oSD.exe SD.lpr"/>
 </CONFIG>

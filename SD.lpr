@@ -11,15 +11,47 @@ uses
   strutils, math, IniFiles;
 
 const
-  StartDir = 1236;
-  EndDir = 1399;
+  StartDir: integer = 1236;
+  EndDir: integer = 1399;
 
-  DebugMode = true;//false;
+  DebugMode: boolean = true;//false;
 
 type
   TSolution = (solIgs, solEu, solMa1);
   TCoordinate = (crdX, crdY, crdZ);
   TFloatList = array of Extended;
+
+const
+  SectionName: array [solIgs..solMa1] of string = ('Igs', 'Eu', 'Ma1');
+
+type
+  { TWeekFiles }
+
+  TWeekFiles = class
+  private
+    FMask: string;
+    FStart, FEnd: integer;
+    FSection: string;
+  public
+    constructor Create(aIni: TIniFile; aIndex: integer; const aSection: string);
+    property Mask: string read FMask write FMask;
+    property WeekStart: integer read FStart write FStart;
+    property WeekEnd: integer read FEnd write FEnd;
+    property Section: string read FSection write FSection;
+  end;
+
+  { TSolutionFile }
+
+  TSolutionFile = class
+  private
+    FWeek: TStringList;
+    FSection: string;
+  public
+    constructor Create(aIni: TIniFile; const aSection: string);
+    destructor Destroy; override;
+    function GetFilename(aWeekNmb: integer): string;
+    property Section: string read FSection write FSection;
+  end;
 
   { TSD }
   TSD = class(TCustomApplication)
@@ -58,8 +90,11 @@ type
 
     function GetToken(aString: string; const SepChar: string; TokenNum: integer): string;
     function RemoveDupSpaces(const aString: string): string;
+    function GetDefDir(aSolution: TSolution): string;
+    procedure Initialize;
   protected
     Dirs: array [solIgs..solMa1] of string;
+    SolutionFiles: array [solIgs..solMa1] of TSolutionFile;
     procedure DoRun; override;
   public
     constructor Create(TheOwner: TComponent); override;
@@ -68,7 +103,104 @@ type
 
   end;
 
+{ TSolutionFile }
+
+constructor TSolutionFile.Create(aIni: TIniFile; const aSection: string);
+var
+  i, n: integer;
+  WeekFile: TWeekFiles;
+begin
+  FWeek := TStringList.Create;
+  Section := aSection;
+  if Assigned(aIni) then
+    n := aIni.ReadInteger(Section, 'Count', 0)
+  else
+    n := 1;
+
+  for i := 1 to n do
+  begin
+    WeekFile := TWeekFiles.Create(aIni, i, Section);
+    FWeek.AddObject(WeekFile.Mask, WeekFile);
+  end;
+end;
+
+destructor TSolutionFile.Destroy;
+var
+  i: integer;
+begin
+  for i := FWeek.Count - 1 downto 0 do
+    FWeek.Objects[i].Free;
+  FWeek.Free;
+  inherited Destroy;
+end;
+
+function TSolutionFile.GetFilename(aWeekNmb: integer): string;
+var
+  i: integer;
+  WeekFile: TWeekFiles;
+begin
+  for i := 0 to FWeek.Count - 1 do
+  begin
+    WeekFile := TWeekFiles(FWeek.Objects[i]);
+    if (aWeekNmb >= WeekFile.WeekStart) and (aWeekNmb <= WeekFile.WeekEnd) then
+    begin
+      Result := AnsiReplaceText(WeekFile.Mask, 'XXXX', IntToStr(aWeekNmb));
+      exit;
+    end;
+  end;
+
+  Result := '';
+end;
+
+{ TWeekFiles }
+
+constructor TWeekFiles.Create(aIni: TIniFile; aIndex: integer; const aSection: string);
+begin
+  inherited Create;
+
+  Section := aSection;
+  if Assigned(aIni) then
+  begin
+    Mask := aIni.ReadString(Section, 'Filename' + IntToStr(aIndex), '');
+    WeekStart := aIni.ReadInteger(Section, 'Filename' + IntToStr(aIndex) + 'start', 0);
+    WeekEnd := aIni.ReadInteger(Section, 'Filename' + IntToStr(aIndex) + 'end', 9999);
+  end
+  else
+  begin
+    Mask := '';
+    WeekStart := 0;
+    WeekEnd := 9999;
+  end;
+end;
+
 { TSD }
+
+procedure TSD.Initialize;
+var
+  i: TSolution;
+  Ini: TIniFile;
+begin
+  if FileExists(ExePath + 'sd.ini') then
+  begin
+    Ini := TIniFile.Create(ExePath + 'sd.ini');
+    try
+      DebugMode := Ini.ReadBool('Common', 'DebugMode', false);
+      StartDir := Ini.ReadInteger('Common', 'StartWeek', 1236);
+      EndDir := Ini.ReadInteger('Common', 'EndWeek', 1399);
+
+      for i := solIgs to solMa1 do
+      begin
+        SolutionFiles[i] := TSolutionFile.Create(Ini, SectionName[i]);
+        Dirs[i] := Ini.ReadString('Directories', SectionName[i], GetDefDir(i));
+      end;
+    finally
+      Ini.Free;
+    end;
+  end
+  else
+    for i := solIgs to solMa1 do
+      Dirs[i] := GetDefDir(i);
+end;
 
 procedure TSD.ProceedPair(aCoord: TCoordinate; aSolution1, aSolution2: TSolution;
   const aWeekNumber: integer; var aDval, aSval: Extended);
@@ -315,26 +447,9 @@ begin
 end;
 
 
-function TSD.GetFileNameForSolution(aSolution: TSolution; aWeekNumber: integer
-  ): string;
+function TSD.GetFileNameForSolution(aSolution: TSolution; aWeekNumber: integer): string;
 begin
-  case aSolution of
-    solIgs:
-      begin
-        if aWeekNumber < 1252 then
-          Result := Dirs[aSolution] + Format('igb03P%4.0d.CRD', [aWeekNumber])
-        else if aWeekNumber < 1304 then
-          Result := Dirs[aSolution] + Format('igb04P%4.0d.CRD', [aWeekNumber])
-        else if aWeekNumber < 1356 then
-          Result := Dirs[aSolution] + Format('igb05P%4.0d.CRD', [aWeekNumber])
-        else
-          Result := Dirs[aSolution] + Format('igb06P%4.0d.CRD', [aWeekNumber]);
-      end;
-    solEu:  Result := Dirs[aSolution] + Format('%4.0d7_i_eu.CRD', [aWeekNumber]);
-    solMa1: Result := Dirs[aSolution] + Format('%4.0d7_i_ma1.CRD', [aWeekNumber]);
-    else
-      Result := '';
-  end;
+  Result := Dirs[aSolution] + SolutionFiles[aSolution].GetFilename(aWeekNumber);
 end;
 
 function TSD.GetStation(const aString: string): string;
@@ -343,13 +458,13 @@ begin
   Result := GetToken(Result, ' ', 2);
 end;
 
-function TSD.GetCoordinate(const aString: string; aCoordinate: TCoordinate
-  ): Extended;
+function TSD.GetCoordinate(const aString: string; aCoordinate: TCoordinate): Extended;
 var
   s: string;
 begin
   s := RemoveDupSpaces(aString);
   //s := GetToken(s, ' ', 4 + Ord(aCoordinate));
+
   case aCoordinate of
     crdX: s := GetToken(s, ' ', 4);
     crdY: s := GetToken(s, ' ', 5);
@@ -359,7 +474,7 @@ begin
   s := AnsiReplaceStr(s, '.', ',');
 
   Result := StrToFloatDef(s, 999999999);
-  Result := {Abs}(Result);
+  Result := (Result);
 end;
 
 
@@ -374,6 +489,20 @@ begin
     Result := AnsiReplaceStr(Result, '  ', ' ');
 
   Result := Trim(Result);
+end;
+
+function TSD.GetDefDir(aSolution: TSolution): string;
+begin
+  case aSolution of
+    solIgs:
+      Result := ExePath + 'igs_crd_hlm\igs\crd\';
+    solEu:
+      Result := ExePath + 'igs_crd_hlm\igs_eu\crd\';
+    solMa1:
+      Result := ExePath + 'igs_crd_hlm\igs_ma1\crd\';
+  else
+    Result := '';
+  end;
 end;
 
 procedure TSD.DoRun;
@@ -405,7 +534,10 @@ begin
 
 try
   { add your program here }
-  AssignFile(f, ExePath + 'debug.out');
+  if not DirectoryExists(ExePath + 'output\') then
+    CreateDir(ExePath + 'output\');
+
+  AssignFile(f, ExePath + 'output\debug.out');
   Rewrite(f);
   ResultList := TStringList.Create;
   ResultListMM := TStringList.Create;
@@ -457,8 +589,8 @@ try
         end;
       end;
 
-      ResultList.SaveToFile(ExePath + 'output' + IntToStr(Ord(Coord)) + '.dat');
-      ResultListMM.SaveToFile(ExePath + 'output' + IntToStr(Ord(Coord)) + '_mm.dat');
+      ResultList.SaveToFile(ExePath + 'output\output' + IntToStr(Ord(Coord)) + '.dat');
+      ResultListMM.SaveToFile(ExePath + 'output\output' + IntToStr(Ord(Coord)) + '_mm.dat');
     end;
   finally
     ResultList.Free;
@@ -479,31 +611,13 @@ end;
 end;
 
 constructor TSD.Create(TheOwner: TComponent);
-var
-   Ini: TIniFile;
 begin
   inherited Create(TheOwner);
-  StopOnException:=True;
+  StopOnException := True;
 
-  ExePath := ExtractFilePath(ExeName);
+  ExePath := IncludeTrailingPathDelimiter(ExtractFilePath(ExeName));
 
-  if FileExists(ExePath + 'sd.ini') then
-  begin
-    Ini := TIniFile.Create(ExePath + 'sd.ini');
-    try
-      Dirs[solIgs] := Ini.ReadString('Directories', 'DirIgs', ExePath + 'igs_crd_hlm\igs\crd\');
-      Dirs[solEu]  := Ini.ReadString('Directories', 'DirEu', ExePath + 'igs_crd_hlm\igs_eu\crd\');
-      Dirs[solMa1] := Ini.ReadString('Directories', 'DirMa1', ExePath + 'igs_crd_hlm\igs_ma1\crd\');
-    finally
-      Ini.Free;
-    end;
-  end
-  else
-  begin
-    Dirs[solIgs] := ExePath + 'igs_crd_hlm\igs\crd\';
-    Dirs[solEu]  := ExePath + 'igs_crd_hlm\igs_eu\crd\';
-    Dirs[solMa1] := ExePath + 'igs_crd_hlm\igs_ma1\crd\';
-  end;
+  Initialize;
 end;
 
 destructor TSD.Destroy;
