@@ -40,9 +40,9 @@
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="0"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="230"/>
-        <CursorPos X="47" Y="259"/>
-        <UsageCount Value="124"/>
+        <TopLine Value="554"/>
+        <CursorPos X="26" Y="570"/>
+        <UsageCount Value="127"/>
         <Bookmarks Count="3">
           <Item0 X="1" Y="1" ID="3"/>
           <Item1 X="23" Y="93" ID="2"/>
@@ -65,7 +65,7 @@
         <WindowIndex Value="0"/>
         <TopLine Value="182"/>
         <CursorPos X="10" Y="199"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="11"/>
         <Loaded Value="True"/>
       </Unit2>
     </Units>
