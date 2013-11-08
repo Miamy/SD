@@ -73,8 +73,8 @@ type
 
     function GetCoordinateListForSolution(aSolution: TSolution;
              aWeekNumber: integer; aCoordinate: TCoordinate): TFloatList;
-    procedure CenterValues(var aCoordinateList: TFloatList;
-      aCommonList: TFloatList);
+    function CenterValues(var aCoordinateList: TFloatList;
+      aCommonList: TFloatList): boolean;
     procedure DebugList(const aCaption: string; aCoordinateList: TFloatList); overload;
     procedure DebugList(const aCaption: string; aCoordinateList: TStringList); overload;
 
@@ -192,6 +192,8 @@ begin
       begin
         SolutionFiles[i] := TSolutionFile.Create(Ini, SectionName[i]);
         Dirs[i] := Ini.ReadString('Directories', SectionName[i], GetDefDir(i));
+        if Dirs[i][2] <> ':' then
+          Dirs[i] := ExePath + Dirs[i];
       end;
     finally
       Ini.Free;
@@ -229,13 +231,19 @@ begin
   for i := Low(CommonList) to High(CommonList) do
     CommonList[i] := Sqr(List1[i] - List2[i]);
   DebugList('List for difference:', CommonList);
-  aDval := Mean(CommonList);
+  if Length(CommonList) > 0 then
+    aDval := Mean(CommonList)
+  else
+    aDval := 0;
   WriteLn(f, '        d = ', FloatToStr(aDval));
 
   for i := Low(CommonList) to High(CommonList) do
     CommonList[i] := Sqr(List1[i] + List2[i]);
   DebugList('List for summary:', CommonList);
-  aSval := Mean(CommonList);
+  if Length(CommonList) > 0 then
+    aSval := Mean(CommonList)
+  else
+    aSval := 0;
   WriteLn(f, '        s = ', FloatToStr(aSval));
 end;
 
@@ -256,7 +264,9 @@ begin
   end;
 
   for i := 0 to 2 do
-    CenterValues(CoordList[i], CommonList);
+    if not CenterValues(CoordList[i], CommonList) then
+      WriteLn('Problems in week #' + IntToStr(aWeekNumber));
+    ;
 end;
 
 function TSD.GetToken(aString: string; const SepChar: string; TokenNum: integer): string;
@@ -301,7 +311,10 @@ begin
   Result := TStringList.Create;
 
   for i := 0 to 2 do
+  begin
     StationList[i] := GetStationListForSolution(TSolution(i), aWeekNumber);
+    WriteLn(f, 'Solution ' + IntToStr(i) + ': ' + StationList[i].DelimitedText);
+  end;
 
   try
     for i := 0 to StationList[0].Count - 1 do
@@ -339,7 +352,10 @@ begin
   Result := TStringList.Create;
   FileName := GetFileNameForSolution(aSolution, aWeekNumber);
   if not FileExists(FileName) then
+  begin
+    WriteLn('File ' + FileName + ' not found.');
     Exit;
+  end;
 
   Result.LoadFromFile(FileName);
   for i := 0 to 5 do
@@ -397,11 +413,12 @@ begin
     IntToStr(Ord(aCoordinate)), Result);
 end;
 
-procedure TSD.CenterValues(var aCoordinateList: TFloatList;
-  aCommonList: TFloatList);
+function TSD.CenterValues(var aCoordinateList: TFloatList;
+  aCommonList: TFloatList): boolean;
 var
   i: integer;
 begin
+  Result := false;
   if Length(aCoordinateList) = 0 then
   begin
     WriteLn('Empty list!');
@@ -418,6 +435,7 @@ begin
     aCoordinateList[i] := aCoordinateList[i] - aCommonList[i];
 
   DebugList('Centered list:', aCoordinateList);
+  Result := true;
 end;
 
 procedure TSD.DebugList(const aCaption: string; aCoordinateList: TFloatList);
@@ -567,23 +585,26 @@ try
           sigma2 := Sqrt((s12 + s23 - s13 + d12 + d23 - d13) / 4);
           sigma3 := Sqrt((s23 + s13 - s12 + d23 + d13 - d12) / 4);
 
-          ro12 := (s12 - d12) / 4 / sigma1 / sigma2;
-          ro13 := (s13 - d13) / 4 / sigma1 / sigma3;
-          ro23 := (s23 - d23) / 4 / sigma2 / sigma3;
+          if (sigma1 > 0) and (sigma2 > 0) and (sigma3 > 0) then
+          begin
+            ro12 := (s12 - d12) / 4 / sigma1 / sigma2;
+            ro13 := (s13 - d13) / 4 / sigma1 / sigma3;
+            ro23 := (s23 - d23) / 4 / sigma2 / sigma3;
 
-          WriteLn(f, '    sigma1 = ' + FloatToStr(sigma1));
-          WriteLn(f, '    sigma2 = ' + FloatToStr(sigma2));
-          WriteLn(f, '    sigma3 = ' + FloatToStr(sigma3));
+            WriteLn(f, '    sigma1 = ' + FloatToStr(sigma1));
+            WriteLn(f, '    sigma2 = ' + FloatToStr(sigma2));
+            WriteLn(f, '    sigma3 = ' + FloatToStr(sigma3));
 
-          WriteLn(f, '    ro12 = ' + FloatToStr(ro12));
-          WriteLn(f, '    ro13 = ' + FloatToStr(ro13));
-          WriteLn(f, '    ro23 = ' + FloatToStr(ro23));
+            WriteLn(f, '    ro12 = ' + FloatToStr(ro12));
+            WriteLn(f, '    ro13 = ' + FloatToStr(ro13));
+            WriteLn(f, '    ro23 = ' + FloatToStr(ro23));
 
-          ResultList.Add(Format('%d    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f',
-            [WeekNumber, sigma1, sigma2, sigma3, ro12, ro13, ro23]));
+            ResultList.Add(Format('%d    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f',
+              [WeekNumber, sigma1, sigma2, sigma3, ro12, ro13, ro23]));
 
-          ResultListMM.Add(Format('%d    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f',
-            [WeekNumber, sigma1 * 1000, sigma2 * 1000, sigma3 * 1000, ro12, ro13, ro23]));
+            ResultListMM.Add(Format('%d    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f    %8.6f',
+              [WeekNumber, sigma1 * 1000, sigma2 * 1000, sigma3 * 1000, ro12, ro13, ro23]));
+          end;
         finally
           CommonStationList.Free;
         end;
