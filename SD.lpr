@@ -144,7 +144,7 @@ begin
     WeekFile := TWeekFiles(FWeek.Objects[i]);
     if (aWeekNmb >= WeekFile.WeekStart) and (aWeekNmb <= WeekFile.WeekEnd) then
     begin
-      Result := AnsiReplaceText(WeekFile.Mask, 'XXXX', IntToStr(aWeekNmb));
+      Result := AnsiReplaceText(WeekFile.Mask, 'XXXX', Format('%4.0d', [aWeekNmb]));
       exit;
     end;
   end;
