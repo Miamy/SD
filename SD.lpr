@@ -82,6 +82,7 @@ type
 
     // input: 17  ANDO 10333M001     2175765.9035    624248.2065   5943417.7863    I
     // output: ANDO
+    // for MA1 solution returns only station with flags A/W
     function GetStation(const aString: string): string;
 
     // input: 17  ANDO 10333M001     2175765.9035    624248.2065   5943417.7863    I
@@ -366,6 +367,7 @@ begin
   for i := Result.Count - 1 downto 0 do
     if Trim(Result[i]) = '' then
       Result.Delete(i);
+
   Result.Sort;
 end;
 
@@ -471,9 +473,15 @@ begin
 end;
 
 function TSD.GetStation(const aString: string): string;
+var
+  Flag: string;
 begin
   Result := RemoveDupSpaces(aString);
-  Result := GetToken(Result, ' ', 2);
+  Flag := GetToken(Result, ' ', 7);
+  if Flag = '' then
+    Result := ''
+  else
+    Result := GetToken(Result, ' ', 2);
 end;
 
 function TSD.GetCoordinate(const aString: string; aCoordinate: TCoordinate): Extended;
