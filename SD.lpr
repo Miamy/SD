@@ -82,7 +82,7 @@ type
 
     // input: 17  ANDO 10333M001     2175765.9035    624248.2065   5943417.7863    I
     // output: ANDO
-    // for MA1 solution returns only station with flags A/W
+    // Returns only station with non-empty flag
     function GetStation(const aString: string): string;
 
     // input: 17  ANDO 10333M001     2175765.9035    624248.2065   5943417.7863    I
